@@ -5,7 +5,8 @@ const {
   updateTransaction,
   deleteTransaction,
   summary,
-  trends
+  trends,
+  dashboardData
 } = require('../controllers/transactionController');
 const { protect } = require('../middleware/authMiddleware');
 const validate = require('../middleware/validate');
@@ -15,6 +16,7 @@ const router = express.Router();
 
 router.use(protect);
 router.get('/', getTransactions);
+router.get('/dashboard', dashboardData);
 router.get('/summary', summary);
 router.get('/trends', trends);
 router.post('/', validate(transactionSchema), createTransaction);
