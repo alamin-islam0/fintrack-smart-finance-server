@@ -60,6 +60,24 @@ app.get("/", (req, res) => {
   res.json({ message: "FinTrack API Server", version: "1.0.0" });
 });
 
+app.get("/api", (req, res) => {
+  res.json({ 
+    message: "FinTrack API services are running", 
+    status: "active",
+    endpoints: [
+      "/api/auth",
+      "/api/transactions",
+      "/api/goals",
+      "/api/insights",
+      "/api/categories",
+      "/api/budgets",
+      "/api/bills",
+      "/api/public",
+      "/api/health"
+    ]
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/goals", goalRoutes);
