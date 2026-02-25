@@ -17,6 +17,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const budgetRoutes = require("./routes/budgetRoutes");
 const billRoutes = require("./routes/billRoutes");
 const publicRoutes = require("./routes/publicRoutes");
+const { getLandingOverview } = require("./controllers/publicController");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const seedAdmin = require("./utils/seedAdmin");
 const seedCategories = require("./utils/seedCategories");
@@ -93,6 +94,10 @@ app.get("/api", (req, res) => {
     ]
   });
 });
+
+// Compatibility aliases for frontend clients using older paths
+app.get("/overview", getLandingOverview);
+app.get("/api/overview", getLandingOverview);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/transactions", transactionRoutes);

@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 
 function getPeriodRange(period) {
@@ -25,29 +26,43 @@ function percentChange(current, prev) {
   return ((current - prev) / Math.abs(prev)) * 100;
 }
 
+function fallbackOverview(period) {
+  return {
+    period,
+    metrics: {
+      totalBalance: 12450,
+      monthlySavings: 2100,
+      netWorth: 85200,
+      totalBalanceChange: 5.2,
+      monthlySavingsChange: 12.4,
+      netWorthChange: 3.1
+    },
+    distribution: [
+      { category: 'Housing & Rent', amount: 2400, percentage: 55 },
+      { category: 'Food & Dining', amount: 850, percentage: 28 },
+      { category: 'Entertainment', amount: 420, percentage: 17 }
+    ]
+  };
+}
+
 const getLandingOverview = asyncHandler(async (req, res) => {
   const period = req.query.period === 'yearly' ? 'yearly' : 'monthly';
   const { start, end, prevStart, prevEnd } = getPeriodRange(period);
 
-  const allRows = await Transaction.find().select('amount type date category');
+  if (mongoose.connection.readyState !== 1) {
+    return res.json(fallbackOverview(period));
+  }
+
+  let allRows = [];
+  try {
+    allRows = await Transaction.find().select('amount type date category');
+  } catch (error) {
+    console.error('Overview query failed:', error.message);
+    return res.json(fallbackOverview(period));
+  }
 
   if (!allRows.length) {
-    return res.json({
-      period,
-      metrics: {
-        totalBalance: 12450,
-        monthlySavings: 2100,
-        netWorth: 85200,
-        totalBalanceChange: 5.2,
-        monthlySavingsChange: 12.4,
-        netWorthChange: 3.1
-      },
-      distribution: [
-        { category: 'Housing & Rent', amount: 2400, percentage: 55 },
-        { category: 'Food & Dining', amount: 850, percentage: 28 },
-        { category: 'Entertainment', amount: 420, percentage: 17 }
-      ]
-    });
+    return res.json(fallbackOverview(period));
   }
 
   const totalIncome = allRows.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0);
