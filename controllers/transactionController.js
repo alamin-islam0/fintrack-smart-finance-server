@@ -1,6 +1,20 @@
 const asyncHandler = require('express-async-handler');
 const Transaction = require('../models/Transaction');
 
+const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+const dashboardCache = new Map();
+
+const buildDashboardCacheKey = (userId, recentLimit) => `${String(userId)}:${recentLimit}`;
+
+const clearDashboardCache = (userId) => {
+  const keyPrefix = `${String(userId)}:`;
+  for (const key of dashboardCache.keys()) {
+    if (key.startsWith(keyPrefix)) {
+      dashboardCache.delete(key);
+    }
+  }
+};
+
 const getTransactions = asyncHandler(async (req, res) => {
   const query = { user: req.user._id };
 
@@ -30,6 +44,7 @@ const getTransactions = asyncHandler(async (req, res) => {
 const createTransaction = asyncHandler(async (req, res) => {
   const payload = req.validated;
   const created = await Transaction.create({ ...payload, user: req.user._id, date: new Date(payload.date) });
+  clearDashboardCache(req.user._id);
   res.status(201).json(created);
 });
 
@@ -42,6 +57,7 @@ const updateTransaction = asyncHandler(async (req, res) => {
 
   Object.assign(trx, { ...req.validated, date: new Date(req.validated.date) });
   await trx.save();
+  clearDashboardCache(req.user._id);
   res.json(trx);
 });
 
@@ -51,6 +67,7 @@ const deleteTransaction = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Transaction not found');
   }
+  clearDashboardCache(req.user._id);
   res.json({ message: 'Deleted' });
 });
 
@@ -122,6 +139,12 @@ const trends = asyncHandler(async (req, res) => {
 const dashboardData = asyncHandler(async (req, res) => {
   const requestedLimit = Number(req.query.recentLimit);
   const recentLimit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 20) : 6;
+  const cacheKey = buildDashboardCacheKey(req.user._id, recentLimit);
+  const cached = dashboardCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.createdAt < DASHBOARD_CACHE_TTL_MS) {
+    return res.json(cached.payload);
+  }
 
   const [summaryRows, trendRows, recentTransactions, categoryRows] = await Promise.all([
     Transaction.aggregate([
@@ -192,7 +215,7 @@ const dashboardData = asyncHandler(async (req, res) => {
     value: item.value
   }));
 
-  res.json({
+  const payload = {
     summary: {
       totalIncome: totals.totalIncome,
       totalExpense: totals.totalExpense,
@@ -203,7 +226,14 @@ const dashboardData = asyncHandler(async (req, res) => {
     recentTransactions,
     categoryBreakdown,
     transactionCount: totals.transactionCount
+  };
+
+  dashboardCache.set(cacheKey, {
+    createdAt: Date.now(),
+    payload
   });
+
+  res.json(payload);
 });
 
 module.exports = {
