@@ -23,18 +23,21 @@ const seedCategories = require("./utils/seedCategories");
 
 const app = express();
 
+// Database connection
 connectDB().catch((err) => {
-  console.error("Failed to start server - MongoDB connection failed:", err);
-  process.exit(1);
+  console.error('Database connection failed:', err.message);
 });
 
-seedAdmin().catch((err) => {
-  console.error("Admin seed skipped due to error:", err.message);
-});
+// Only seed if not in production to avoid slow startup on Vercel
+if (process.env.NODE_ENV !== 'production') {
+  seedAdmin().catch((err) => {
+    console.error('Admin seed skipped:', err.message);
+  });
 
-seedCategories().catch((err) => {
-  console.error("Category seed skipped due to error:", err.message);
-});
+  seedCategories().catch((err) => {
+    console.error('Category seed skipped:', err.message);
+  });
+}
 
 app.use(helmet());
 app.use(
