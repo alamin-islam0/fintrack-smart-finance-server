@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 let cachedConnection = null;
 let connectionPromise = null;
 
+mongoose.set("bufferCommands", false);
+
 async function connectDB() {
   if (cachedConnection && mongoose.connection.readyState === 1) {
     return cachedConnection;
@@ -24,6 +26,7 @@ async function connectDB() {
     console.log("MongoDB connected successfully");
     return cachedConnection;
   } catch (error) {
+    cachedConnection = null;
     connectionPromise = null;
     console.error("MongoDB connection error:", error.message);
     throw error;

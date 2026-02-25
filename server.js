@@ -24,22 +24,6 @@ const seedCategories = require("./utils/seedCategories");
 
 const app = express();
 
-// Database connection
-connectDB().catch((err) => {
-  console.error('Database connection failed:', err.message);
-});
-
-// Only seed if not in production to avoid slow startup on Vercel
-if (process.env.NODE_ENV !== 'production') {
-  seedAdmin().catch((err) => {
-    console.error('Admin seed skipped:', err.message);
-  });
-
-  seedCategories().catch((err) => {
-    console.error('Category seed skipped:', err.message);
-  });
-}
-
 app.use(helmet());
 const allowedOrigins = [
   process.env.CLIENT_URL,
@@ -95,6 +79,19 @@ app.get("/api", (req, res) => {
   });
 });
 
+// Ensure DB is ready before handling API routes that require MongoDB.
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    return next();
+  } catch (error) {
+    console.error("Database unavailable:", error.message);
+    return res.status(503).json({
+      message: "Database is temporarily unavailable. Please try again shortly."
+    });
+  }
+});
+
 // Compatibility aliases for frontend clients using older paths
 app.get("/overview", getLandingOverview);
 app.get("/api/overview", getLandingOverview);
@@ -114,6 +111,21 @@ app.use(errorHandler);
 
 const basePort = Number(process.env.PORT) || 5000;
 
+async function initializeDatabase() {
+  await connectDB();
+
+  // Only seed if not in production to avoid slow startup on Vercel.
+  if (process.env.NODE_ENV !== 'production') {
+    await seedAdmin().catch((err) => {
+      console.error('Admin seed skipped:', err.message);
+    });
+
+    await seedCategories().catch((err) => {
+      console.error('Category seed skipped:', err.message);
+    });
+  }
+}
+
 function startServer(port) {
   const server = app.listen(port, () =>
     console.log(`Server running on port ${port}`),
@@ -131,7 +143,12 @@ function startServer(port) {
 }
 
 if (require.main === module) {
-  startServer(basePort);
+  initializeDatabase()
+    .then(() => startServer(basePort))
+    .catch((error) => {
+      console.error("Failed to initialize database:", error.message);
+      process.exit(1);
+    });
 }
 
 module.exports = app;
