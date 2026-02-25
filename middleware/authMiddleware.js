@@ -28,6 +28,27 @@ const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
+const optionalProtect = asyncHandler(async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+    if (user) {
+      req.user = user;
+    }
+  } catch (error) {
+    console.warn('Optional auth skipped:', error.message);
+  }
+
+  return next();
+});
+
 const allowRoles = (...roles) => (req, res, next) => {
   if (!roles.includes(req.user.role)) {
     res.status(403);
@@ -36,4 +57,4 @@ const allowRoles = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { protect, allowRoles };
+module.exports = { protect, optionalProtect, allowRoles };

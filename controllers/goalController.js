@@ -2,6 +2,10 @@ const asyncHandler = require('express-async-handler');
 const SavingsGoal = require('../models/SavingsGoal');
 
 const getGoals = asyncHandler(async (req, res) => {
+  if (!req.user?._id) {
+    return res.json([]);
+  }
+
   const goals = await SavingsGoal.find({ user: req.user._id }).sort('-createdAt');
   res.json(goals);
 });
